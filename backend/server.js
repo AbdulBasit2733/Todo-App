@@ -4,10 +4,13 @@ const bcrypt = require("bcrypt");
 const z = require("zod");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-
-const JWT_SECRET = "1fgdgdfgd1dfsda";
 const { UserModel, TodoModel } = require("./Database");
 
+require("dotenv").config();
+
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET;
+const MONGODB_URI = process.env.MONGODB_URI;
 const app = express();
 
 //Middlewares
@@ -18,9 +21,7 @@ app.use(cors());
 // MongoDb Connect
 
 mongoose
-  .connect(
-    "mongodb+srv://abdulbasitkhan2733:TWRCaGaL2MjKDR12@todo-app.jehsr.mongodb.net/todo-app"
-  )
+  .connect(`${MONGODB_URI}/todo-app`)
   .then(() => {
     console.log("Connected To The Database");
   })
@@ -125,24 +126,27 @@ app.post("/api/todo-app/auth/register", async (req, res) => {
 app.post("/api/todo-app/auth/login", async (req, res) => {
   const { email, password } = req.body;
 
-  const userSendedBody = z.object({
-    email: z.string().email({ message: "Invalid email Address" }),
-    password: z
-      .string()
-      .min(3, { message: "Password must be at least greater than 3" }),
-  });
-
-  const validationResult = userSendedBody.safeParse({ email, password });
-  if (!validationResult.success) {
-    const errMessage = validationResult.error.errors.map((err) => err.message);
-    return res.json({
-      success: false,
-      message: errMessage,
-    });
-  }
-
   try {
-    const isUser = await UserModel.findOne({ email: email });
+    // Validate the request body using Zod
+    const userSendedBody = z.object({
+      email: z.string().email({ message: "Invalid email address" }),
+      password: z
+        .string()
+        .min(3, { message: "Password must be at least 3 characters long" }),
+    });
+
+    const validationResult = userSendedBody.safeParse({ email, password });
+
+    if (!validationResult.success) {
+      const errMessage = validationResult.error.errors.map((err) => err.message);
+      return res.status(400).json({
+        success: false,
+        message: errMessage,
+      });
+    }
+
+    // Check if user exists
+    const isUser = await UserModel.findOne({ email });
     if (!isUser) {
       return res.status(400).json({
         success: false,
@@ -150,25 +154,28 @@ app.post("/api/todo-app/auth/login", async (req, res) => {
       });
     }
 
-    bcrypt.compare(password, isUser.password, (err, result) => {
-      if (!result) {
-        return res.status(400).json({
-          success: false,
-          message: "Email or password is incorrect",
-        });
-      } else {
-        const token = jwt.sign({ id: isUser._id }, JWT_SECRET);
-        res.status(200).json({
-          success: true,
-          token: token,
-          message: "Logged in successfully",
-        });
-      }
+    // Compare passwords using bcrypt
+    const isMatch = await bcrypt.compare(password, isUser.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Email or password is incorrect",
+      });
+    }
+
+    // Create JWT token
+    const token = jwt.sign({ id: isUser._id }, JWT_SECRET, { expiresIn: "1h" });
+
+    // Send success response
+    return res.status(200).json({
+      success: true,
+      token: token,
+      message: "Logged in successfully",
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Server error",
     });
   }
 });
@@ -236,7 +243,7 @@ app.post("/api/todo-app/deletetodo", authMiddleWare, async (req, res) => {
   try {
     const userId = req.id;
     const { id } = req.body;
-    
+
     if (!userId || !id) {
       return res.json({
         success: false,
@@ -249,14 +256,16 @@ app.post("/api/todo-app/deletetodo", authMiddleWare, async (req, res) => {
     });
 
     if (response.deletedCount === 0) {
-      return res.json({ success: false, message: "Todo Not Found or Not Deleted" });
+      return res.json({
+        success: false,
+        message: "Todo Not Found or Not Deleted",
+      });
     }
 
     res.json({
       success: true,
       message: "Todo Deleted Successfully",
     });
-
   } catch (error) {
     console.log(error);
     res.status(500).json({
@@ -266,7 +275,6 @@ app.post("/api/todo-app/deletetodo", authMiddleWare, async (req, res) => {
   }
 });
 
-
-app.listen(3000, () => {
+app.listen(PORT, () => {
   console.log("Server is running on port 3000");
 });

@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 const Login = () => {
+
+  const API_URL = import.meta.env.VITE_API_URL;
   const navigate = useNavigate();
   const token = localStorage.getItem('token')
   const [loading, setLoading] = useState(false);
@@ -12,18 +14,18 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      setLoading(false);
+      setLoading(true); // Start loading
       const email = emailRef.current.value;
       const password = passwordRef.current.value;
-      const response = await axios.post(
-        "http://localhost:3000/api/todo-app/auth/login",
-        {
-          email,
-          password,
-        }
-      );
+      
+      // Send login request
+      const response = await axios.post(`${API_URL}/auth/login`, {
+        email,
+        password,
+      });
+  
+      // Check if login is successful
       if (response.data.success) {
-        setLoading(true);
         alert(response.data.message);
         localStorage.setItem("token", response.data.token);
         setTimeout(() => {
@@ -31,12 +33,25 @@ const Login = () => {
           setLoading(false);
         }, 2000);
       } else {
-        setLoading(false);
         alert(response.data.message);
+        setLoading(false);
       }
     } catch (error) {
       setLoading(false);
-      alert(error.message);
+      
+      // Check if it's an Axios error and handle the response
+      if (error.response) {
+        // The request was made, and the server responded with a status code
+        // that falls outside the range of 2xx (e.g., 400, 404, etc.)
+        alert(error.response.data.message || "An error occurred");
+  
+      } else if (error.request) {
+        // The request was made, but no response was received
+        alert("No response from server. Please try again later.");
+      } else {
+        // Something else happened in making the request
+        alert(`Error: ${error.message}`);
+      }
     }
   };
 
@@ -47,7 +62,7 @@ const Login = () => {
   return (
     <>
       {loading ? (
-        <div className="text-center text-4xl text-blue-600 font-barlow font-bold">
+        <div className="text-center text-4xl text-blue-600 font-barlow font-bold py-20">
           loading...
         </div>
       ) : (

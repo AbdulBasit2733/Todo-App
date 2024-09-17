@@ -3,6 +3,7 @@ import React, { useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 const Register = () => {
+  const API_URL = import.meta.env.VITE_API_URL;
   const navigate = useNavigate();
   const emailRef = useRef();
   const passwordRef = useRef();
@@ -10,23 +11,45 @@ const Register = () => {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    const email = emailRef.current.value;
-    const password = passwordRef.current.value;
-    const name = nameRef.current.value;
 
-    const response = await axios.post(
-      "http://localhost:3000/api/todo-app/auth/register",
-      {
+    try {
+      // Capture form values
+      const email = emailRef.current.value;
+      const password = passwordRef.current.value;
+      const name = nameRef.current.value;
+
+      // Send registration request to the backend
+      const response = await axios.post(`${API_URL}/auth/register`, {
         email,
         password,
         name,
+      });
+
+      // Check if registration is successful
+      if (response.data.success) {
+        alert(response.data.message);
+        navigate("/login"); // Redirect to login page on success
+      } else {
+        alert(response.data.message); // Handle backend validation errors
       }
-    );
-    if (response.data.success) {
-      alert(response.data.message);
-      navigate("/login");
+    } catch (error) {
+      // Handle different error cases
+      if (error.response) {
+        // The request was made, and the server responded with a status code
+        // that falls outside the range of 2xx (e.g., 400 for validation errors)
+        alert(
+          error.response.data.message || "An error occurred during registration"
+        );
+      } else if (error.request) {
+        // The request was made, but no response was received
+        alert("No response from server. Please try again later.");
+      } else {
+        // Something else happened in making the request
+        alert(`Error: ${error.message}`);
+      }
     }
   };
+
   return (
     <section id="register" className="bg-slate-900 min-h-screen font-barlow">
       <h1 className="text-white font-bold text-4xl text-center pt-10">
@@ -40,7 +63,7 @@ const Register = () => {
           >
             <label className="text-lg font-bold">Name</label>
             <input
-            required
+              required
               ref={nameRef}
               type="text"
               placeholder="Enter Your Name"
@@ -49,7 +72,7 @@ const Register = () => {
 
             <label className="text-lg font-bold">Email</label>
             <input
-            required
+              required
               ref={emailRef}
               type="email"
               placeholder="Enter Your Email"
@@ -58,7 +81,7 @@ const Register = () => {
 
             <label className="text-lg font-bold">Password</label>
             <input
-            required
+              required
               type="password"
               ref={passwordRef}
               placeholder="Enter Your Password"
